@@ -38,6 +38,7 @@ import {
   cleanLettaFromClaudeMd,
   getMode,
   getTempStateDir,
+  getSdkToolsMode,
   LETTA_API_BASE,
 } from './conversation_utils.js';
 
@@ -404,7 +405,9 @@ async function main(): Promise<void> {
     console.log(outputs.join('\n\n'));
     
     // Send user prompt to Letta early (gives Letta a head start while Claude processes)
-    if (sessionId && hookInput?.prompt && state) {
+    // Skip in SDK mode — the SDK Stop hook handles all communication with Sub,
+    // and sending here would race with it on the same conversation (409 conflict).
+    if (sessionId && hookInput?.prompt && state && getSdkToolsMode() === 'off') {
       try {
         // Ensure we have a conversation
         const convId = await getOrCreateConversation(apiKey, agentId, sessionId, cwd, state);

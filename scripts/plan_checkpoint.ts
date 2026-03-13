@@ -37,6 +37,7 @@ import {
   getSyncStateFile,
   LogFn,
   getTempStateDir,
+  getSdkToolsMode,
 } from './conversation_utils.js';
 import {
   readTranscript,
@@ -245,6 +246,13 @@ async function main(): Promise<void> {
 
   if (mode === 'off') {
     log('Checkpoint mode is off, exiting');
+    process.exit(0);
+  }
+
+  // In SDK mode, the Stop hook SDK worker handles all communication with Sub.
+  // Checkpoint messages would race on the same conversation (409 conflict).
+  if (getSdkToolsMode() !== 'off') {
+    log('SDK tools mode active, skipping checkpoint (Stop hook handles communication)');
     process.exit(0);
   }
 
