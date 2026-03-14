@@ -78,14 +78,13 @@ async function sendViaSdk(payload: SdkPayload): Promise<boolean> {
 
     for await (const msg of session.stream()) {
       messageCount++;
-      // Log every message type for debugging
-      const preview = (msg as any).content
-        ? String((msg as any).content).substring(0, 80)
-        : JSON.stringify(msg).substring(0, 120);
-      log(`  [${messageCount}] type=${msg.type} | ${preview}`);
-
       if (msg.type === 'assistant' && msg.content) {
         assistantResponse += msg.content;
+        log(`  Assistant chunk: ${msg.content.substring(0, 100)}...`);
+      } else if (msg.type === 'tool_call') {
+        log(`  Tool call: ${(msg as any).toolName}`);
+      } else if (msg.type === 'error') {
+        log(`  Error: ${(msg as any).message}`);
       }
     }
 

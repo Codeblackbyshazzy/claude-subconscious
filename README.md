@@ -111,8 +111,7 @@ export LETTA_BASE_URL="http://localhost:8283"  # For self-hosted Letta
 export LETTA_MODEL="anthropic/claude-sonnet-4-5"  # Model override
 export LETTA_CONTEXT_WINDOW="1048576"             # Context window size (e.g. 1M tokens)
 export LETTA_HOME="$HOME"      # Consolidate .letta state to ~/.letta/
-export LETTA_CHECKPOINT_MODE="blocking"  # Or "async", "off"
-export LETTA_SDK_TOOLS="read-only"       # Or "full", "off"
+export LETTA_SDK_TOOLS="read-only"       # Or "full"
 ```
 
 - `LETTA_MODE` - Controls what gets injected. `whisper` (default, messages only), `full` (blocks + messages), `off` (disable). See [Modes](#modes).
@@ -121,8 +120,7 @@ export LETTA_SDK_TOOLS="read-only"       # Or "full", "off"
 - `LETTA_MODEL` - Override the agent's model. Optional - the plugin auto-detects and selects from available models. See [Model Configuration](#model-configuration) below.
 - `LETTA_CONTEXT_WINDOW` - Override the agent's context window size (in tokens). Useful when `LETTA_MODEL` is set to a model with a large context window that differs from the server default. Example: `1048576` for 1M tokens.
 - `LETTA_HOME` - Base directory for plugin state files. Creates `{LETTA_HOME}/.letta/claude/` for session data and conversation mappings. Defaults to current working directory. Set to `$HOME` to consolidate all state in one location.
-- `LETTA_CHECKPOINT_MODE` - Controls checkpoint behavior at natural pause points (`AskUserQuestion`, `ExitPlanMode`). See [Checkpoint Hooks](#checkpoint-hooks).
-- `LETTA_SDK_TOOLS` - Controls client-side tool access for the Subconscious agent. See [SDK Tools](#sdk-tools).
+- `LETTA_SDK_TOOLS` - Controls client-side tool access for the Subconscious agent. `read-only` (default) or `full`. See [SDK Tools](#sdk-tools).
 
 ### Modes
 
@@ -255,9 +253,8 @@ The plugin uses four Claude Code hooks:
 |------|--------|---------|---------|
 | `SessionStart` | `session_start.ts` | 5s | Notifies agent, cleans up legacy CLAUDE.md |
 | `UserPromptSubmit` | `sync_letta_memory.ts` | 10s | Injects memory + messages via stdout |
-| `PreToolUse` (checkpoint) | `plan_checkpoint.ts` | 10s | Sends transcript at `AskUserQuestion`/`ExitPlanMode` |
-| `PreToolUse` (general) | `pretool_sync.ts` | 5s | Mid-workflow updates via `additionalContext` |
-| `Stop` | `send_messages_to_letta.ts` | 15s | Spawns background worker to send transcript |
+| `PreToolUse` | `pretool_sync.ts` | 5s | Mid-workflow updates via `additionalContext` |
+| `Stop` | `send_messages_to_letta.ts` | 120s | Spawns SDK worker to send transcript (async) |
 
 ### SessionStart
 
@@ -273,7 +270,6 @@ Before each prompt is processed:
 - Fetches agent's current memory blocks and messages
 - In `full` mode: injects all blocks on first prompt, diffs on subsequent prompts
 - In `whisper` mode: injects only messages from Sub
-- Sends user prompt to Letta early (gives the agent a head start)
 
 ### PreToolUse
 
@@ -281,29 +277,6 @@ Before each tool use:
 - Checks for new messages or memory changes since last sync
 - If updates found, injects them via `additionalContext`
 - Silent no-op if nothing changed
-
-### Checkpoint Hooks
-
-At certain "natural pause points" — when Claude asks a question (`AskUserQuestion`) or finishes planning (`ExitPlanMode`) — the plugin sends the current transcript to Letta so your Subconscious can provide guidance before Claude proceeds.
-
-**Why this matters:** Normally, Letta only sees transcripts when Claude stops responding (via the Stop hook). Checkpoint hooks let your Subconscious intervene at decision points:
-- Before the user answers a question Claude asked
-- Before implementation begins after a plan is approved
-
-**Configuration via `LETTA_CHECKPOINT_MODE`:**
-
-| Mode | Behavior |
-|------|----------|
-| `blocking` (default) | Wait for Letta response (~2-5s), inject as `additionalContext` before tool executes |
-| `async` | Fire-and-forget; guidance arrives on next `UserPromptSubmit` |
-| `off` | Disable checkpoint hooks; only Stop hook sends transcripts |
-
-In blocking mode, Letta's response is injected as:
-```xml
-<letta_message checkpoint="AskUserQuestion">
-Consider asking about X before proceeding...
-</letta_message>
-```
 
 ### SDK Tools
 
@@ -315,9 +288,8 @@ By default, the Subconscious agent now gets **client-side tool access** via the 
 |------|----------------|----------|
 | `read-only` (default) | `Read`, `Grep`, `Glob`, `web_search`, `fetch_webpage` | Safe background research and file reading |
 | `full` | All tools (Bash, Edit, Write, etc.) | Full autonomy — Sub can make changes |
-| `off` | None (memory-only) | Legacy behavior, raw API transport |
 
-> **Note:** Requires `@letta-ai/letta-code-sdk` (installed as a dependency). Set `LETTA_SDK_TOOLS=off` to use the legacy raw API path without the SDK.
+> **Note:** Requires `@letta-ai/letta-code-sdk` (installed as a dependency).
 
 ### Stop
 
@@ -330,9 +302,9 @@ Uses an **async hook** pattern — runs in the background without blocking Claud
    - Spawns detached background worker
    - Exits immediately
 
-2. Background worker runs independently:
-   - **SDK mode** (`send_worker_sdk.ts`): Opens a Letta Code SDK session, giving Sub client-side tools
-   - **Legacy mode** (`send_worker.ts`): Sends via raw API (memory-only)
+2. Background worker (`send_worker_sdk.ts`) runs independently:
+   - Opens a Letta Code SDK session, giving Sub client-side tools
+   - Sub processes the transcript and can use Read/Grep/Glob to explore the codebase
    - Updates state on success
    - Cleans up temp file
 
@@ -353,9 +325,8 @@ Persisted in your project directory (this is **conversation bookkeeping**, not a
 Log files for debugging:
 - `session_start.log` - Session initialization
 - `sync_letta_memory.log` - Memory sync operations
-- `plan_checkpoint.log` - Checkpoint hooks (AskUserQuestion/ExitPlanMode)
 - `send_messages.log` - Main Stop hook
-- `send_worker.log` - Background worker
+- `send_worker_sdk.log` - SDK background worker
 
 ## What Your Agent Receives
 
