@@ -206,9 +206,11 @@ The model handle format is `provider/model`. Common options:
 | `openai` | `gpt-5.2`, `gpt-5-nano`, `gpt-4.1-mini` |
 | `anthropic` | `claude-sonnet-4-5`, `claude-opus-4-5`, `claude-haiku-4-5` |
 | `google_ai` | `gemini-3-flash`, `gemini-2.5-flash`, `gemini-2.5-pro` |
-| `zai` | `glm-5` (Letta Cloud default) |
+| `zai` | `glm-5` (Letta Cloud default, free) |
 
 If `LETTA_MODEL` is set but not available on the server, the plugin will warn you and fall back to auto-selection.
+
+The default bundled agent uses `zai/glm-5` (free on Letta Cloud). For better tool usage and reasoning, consider switching to a stronger model. You can change the model at any time via the [Agent Development Environment](https://app.letta.com) (ADE) or by setting `LETTA_MODEL`.
 
 **Note:** Ensure your Letta server has the appropriate API key configured for your chosen provider (e.g., `OPENAI_API_KEY` for OpenAI models).
 
@@ -297,8 +299,10 @@ By default, the Subconscious agent now gets **client-side tool access** via the 
 | Mode | Tools Available | Use Case |
 |------|----------------|----------|
 | `read-only` (default) | `Read`, `Grep`, `Glob`, `web_search`, `fetch_webpage` | Safe background research and file reading |
-| `full` | All tools (Bash, Edit, Write, etc.) | Full autonomy — Sub can make changes |
+| `full` | All tools (Bash, Edit, Write, Task, etc.) | Full autonomy — Sub can make changes and spawn sub-agents |
 | `off` | None (memory-only) | Listen-only — Sub processes transcripts but has no client-side tools |
+
+In `full` mode, Sub can spawn sub-agents via the `Task` tool — dispatching parallel research or delegating work to other agents while Claude Code continues working.
 
 > **Note:** Requires `@letta-ai/letta-code-sdk` (installed as a dependency).
 
