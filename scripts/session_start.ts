@@ -285,11 +285,11 @@ async function main(): Promise<void> {
     writeTty('\n');
 
     // Settings
-    const checkpointMode = process.env.LETTA_CHECKPOINT_MODE || 'blocking';
+    const sdkTools = process.env.LETTA_SDK_TOOLS || 'read-only';
     const baseUrl = process.env.LETTA_BASE_URL || 'https://api.letta.com';
     writeTty(`  Model:      ${modelHandle}\n`);
     writeTty(`  Mode:       ${mode}\n`);
-    writeTty(`  Checkpoint: ${checkpointMode}\n`);
+    writeTty(`  SDK Tools:  ${sdkTools}\n`);
     if (process.env.LETTA_BASE_URL) {
       writeTty(`  Server:     ${baseUrl}\n`);
     }
